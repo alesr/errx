@@ -4,21 +4,63 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/alesr/errx)](https://goreportcard.com/report/github.com/alesr/errx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-## Why errx?
+## The Problem
 
-See the difference instantly. Instead of a basic error message:
+You know the drill. Every time you handle an error, you're supposed to add context and wrap the previous one:
+
+```go
+func processOrder(id string) error {
+    err := validateOrder(id)
+    if err != nil {
+        return fmt.Errorf("validating order %s: %w", id, err)
+    }
+
+    err = saveOrder(id)
+    if err != nil {
+        return fmt.Errorf("saving order %s: %w", id, err)
+    }
+
+    // ... and so on
+}
+```
+
+It's good practice, but honestly? It gets old fast. You end up with:
+- Repetitive error wrapping everywhere
+- Inconsistent context messages
+- Missing context when you're in a hurry
+- Still no idea where the hell the error actually came from
+
+## The Solution
+
+**errx** does what you should be doing manually, but automatically:
+
+```go
+func processOrder(id string) error {
+    err := validateOrder(id)
+    if err != nil {
+        return errx.Wrap(err) // That's it
+    }
+    return nil
+}
+```
+
+And you get this:
 
 ```
-database connection failed
+processOrder (orders.go:15) at 2023-04-15T10:30:47Z: validateOrder (validation.go:23) at 2023-04-15T10:30:47Z: checkCustomer (customer.go:45) at 2023-04-15T10:30:47Z: order validation failed: invalid customer ID
 ```
 
-Get comprehensive debugging context automatically:
+One `errx.Wrap()` call gives you the full call stack with timestamps. No manual context needed.
 
-```
-main.main (main.go:12) at 2023-04-15T10:30:47Z: app.initializeApp (app.go:23) at 2023-04-15T10:30:47Z: database.Connect (db.go:45) at 2023-04-15T10:30:47Z: database connection failed
-```
+## Why This Matters
 
-**All from a single `errx.Wrap()` call.** No manual context strings needed.
+Think of it as lightweight tracing for errors. If you're not ready to invest in full distributed tracing (or don't need it), this gives you most of the debugging benefits with zero setup.
+
+Perfect for:
+- Small to medium projects
+- Microservices that don't have tracing yet
+- When you want better errors without the overhead
+- Teams that keep forgetting to add proper error context
 
 ## Quick Start
 
@@ -36,13 +78,13 @@ func deepFunction() error {
 }
 
 func middleFunction() error {
-    return deepFunction() // No errx needed here
+    return deepFunction() // wrapping is optional until you need it
 }
 
 func topFunction() error {
     err := middleFunction()
     if err != nil {
-        return errx.Wrap(err) // Single wrap captures everything
+        return errx.Wrap(err) // one wrap captures everything
     }
     return nil
 }
@@ -55,157 +97,113 @@ func main() {
 }
 ```
 
-## Runnable Example
-
-Run `go test -run Example` to see errx in action:
-
-```go
-func Example() {
-    originalErr := errors.New("database connection failed")
-    wrappedErr := Wrap(originalErr)
-
-    fmt.Println("Original error preserved:", errors.Is(wrappedErr, originalErr))
-    
-    unwrappedErr := errors.Unwrap(wrappedErr)
-    fmt.Println("Unwrapped error:", unwrappedErr.Error())
-    
-    nilErr := Wrap(nil)
-    fmt.Println("Wrapping nil returns nil:", nilErr == nil)
-    
-    // Output:
-    // Original error preserved: true
-    // Unwrapped error: database connection failed
-    // Wrapping nil returns nil: true
-}
-```
-
-## What is errx?
-
-A lightweight Go package that automatically captures comprehensive debugging context from your call stack. Unlike traditional error wrapping that requires manual context at each level, errx intelligently scans the entire call stack in a single operation.
-
-**Key Benefits:**
-- **Automatic context capture** - No manual context strings needed
-- **Complete call stack visibility** - See the full error journey  
-- **Single wrap coverage** - Works even when intermediate functions don't use errx
-- **Standard library compatible** - Works with `errors.Is`, `errors.As`, `errors.Unwrap`
-- **Efficient design** - Stack scanning only on first wrap
-
 ## Installation
 
 ```bash
 go get github.com/alesr/errx
 ```
 
-## Detailed Examples
+## How It Works
 
-### Comprehensive Stack Capture
+**First wrap on a new error:**
+- Scans up the call stack (up to 10 levels)
+- Captures function names, files, line numbers, timestamps
+- Stores it all efficiently
 
-errx automatically captures context from multiple functions, even when they don't use errx:
+**Subsequent wraps on already-wrapped errors:**
+- Just adds the current call to the chain
+- No expensive stack scanning
 
-```go
-func apiCall() error {
-    return errors.New("API timeout")
-}
+**You get:**
+- Function names (cleaned up, no ugly package paths)
+- File names and line numbers
+- RFC3339 timestamps
+- Full compatibility with `errors.Is`, `errors.As`, `errors.Unwrap`
 
-func processRequest() error {
-    // This function doesn't wrap - just passes through
-    return apiCall()
-}
+## Examples
 
-func handleRequest() error {
-    err := processRequest()
-    if err != nil {
-        // Single wrap captures the entire call chain
-        return errx.Wrap(err)
-    }
-    return nil
-}
-```
-
-### Verbose Output Format
-
-Use `%+v` for detailed frame-by-frame output:
+### Basic Usage
 
 ```go
-err := handleRequest()
+err := someFunction()
 if err != nil {
-    fmt.Printf("%+v\n", err)
+    return errx.Wrap(err)
 }
-
-// Output:
-// [0] service.controller (controller.go:20) at 2023-04-15T10:30:47Z: API timeout
-// [1] business.processRequest (logic.go:15) at 2023-04-15T10:30:47Z: API timeout
-// [2] api.callExternal (client.go:10) at 2023-04-15T10:30:47Z: API timeout
-// [3] main.main (main.go:25) at 2023-04-15T10:30:47Z: API timeout
 ```
 
-### Chaining Multiple Wraps
+### Multiple Wraps
 
-When you wrap an already wrapped error, errx efficiently adds just the current context:
+When functions in the chain each add their own wrap:
 
 ```go
 func level1() error {
-    err := errors.New("original error")
-    return errx.Wrap(err) // Captures full stack
+    return errx.Wrap(errors.New("original error"))
 }
 
 func level2() error {
-    err := level1()
-    if err != nil {
-        return errx.Wrap(err) // Just adds current frame
+    if err := level1(); err != nil {
+        return errx.Wrap(err) // adds level2 to the chain
     }
     return nil
 }
 ```
 
-### Integration with Manual Context
+### Verbose Output
 
-Combine errx with traditional error wrapping when needed:
+Use `%+v` to see each frame on its own line:
+
+```go
+fmt.Printf("%+v\n", err)
+// Output:
+// [0] handleRequest (handler.go:20) at 2023-04-15T10:30:47Z: API timeout
+// [1] processRequest (logic.go:15) at 2023-04-15T10:30:47Z: API timeout
+// [2] callAPI (client.go:10) at 2023-04-15T10:30:47Z: API timeout
+```
+
+### Mix with Manual Context
+
+You can still add manual context when needed:
 
 ```go
 func processOrder(orderID string) error {
     err := validateOrder(orderID)
     if err != nil {
-        // Add manual context first
         contextual := fmt.Errorf("processing order %s: %w", orderID, err)
-        // Then capture stack context
-        return errx.Wrap(contextual)
+        return errx.Wrap(contextual) // combines both approaches
     }
     return nil
 }
 ```
 
-## How It Works
+## When NOT to Use This
 
-**First Wrap (new error):**
-1. Captures current caller function context
-2. Scans call stack up to 10 levels deep
-3. Records function name, file, line number, and timestamp for each frame
-4. Stores all context efficiently
+- High-performance hot paths (stack scanning has overhead)
+- When you already have comprehensive tracing
+- Libraries that others will import (let them decide on error handling)
 
-**Subsequent Wraps (already wrapped):**
-1. Just adds current caller to existing frame chain
-2. No expensive stack scanning - maximum efficiency
+## Runnable Example
 
-**Information Captured:**
-- Function name (shortened for readability)
-- File name (base name only)
-- Line number
-- Timestamp (RFC3339 format)
-- Original error message (preserved)
+Run `go test -run Example ./examples` to see errx in action:
 
-## Formatting Options
+```go
+func Example() {
+    originalErr := errors.New("database connection failed")
+    wrappedErr := errx.Wrap(originalErr)
 
-- **Standard format** (`%s`, `%v`): Single line with all context
-- **Verbose format** (`%+v`): Multi-line with frame indices
-- **Error interface**: Compatible with all standard error handling
+    fmt.Println("Original error preserved:", errors.Is(wrappedErr, originalErr))
 
-## Compatibility
+    unwrappedErr := errors.Unwrap(wrappedErr)
+    fmt.Println("Unwrapped error:", unwrappedErr.Error())
 
-- ✅ Full compatibility with Go's standard error handling
-- ✅ Works with `errors.Is`, `errors.As`, `errors.Unwrap`
-- ✅ Zero dependencies beyond Go standard library
-- ✅ Safe for concurrent use
+    nilErr := errx.Wrap(nil)
+    fmt.Println("Wrapping nil returns nil:", nilErr == nil)
+
+    // Output:
+    // Original error preserved: true
+    // Unwrapped error: database connection failed
+    // Wrapping nil returns nil: true
+}
+```
 
 ## License
 
