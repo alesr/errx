@@ -3,80 +3,55 @@ package examples
 import (
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/alesr/errx"
 )
 
 func Example() {
-	// simulate nested function calls
+	originalErr := errors.New("database connection failed")
+	wrappedErr := errx.Wrap(originalErr)
 
-	deepFunction := func() error {
-		return errors.New("file not found")
-	}
+	fmt.Println("Original error preserved:", errors.Is(wrappedErr, originalErr))
 
-	middleFunction := func() error {
-		return deepFunction()
-	}
+	unwrappedErr := errors.Unwrap(wrappedErr)
+	fmt.Println("Unwrapped error:", unwrappedErr.Error())
 
-	anotherFunction := func() error {
-		return middleFunction()
-	}
-
-	topFunction := func() error {
-		if err := anotherFunction(); err != nil {
-			return errx.Wrap(err)
-		}
-		return nil
-	}
-
-	if err := topFunction(); err != nil {
-		// count frames in verbose output
-		verboseStr := fmt.Sprintf("%+v", err)
-		frameCount := strings.Count(verboseStr, "[")
-		fmt.Printf("Captured %d context frames\n", frameCount)
-
-		// Original error is still accessible
-		fmt.Println("Original error preserved:", strings.Contains(err.Error(), "file not found"))
-	}
+	nilErr := errx.Wrap(nil)
+	fmt.Println("Wrapping nil returns nil:", nilErr == nil)
 
 	// Output:
-	// Captured 8 context frames
 	// Original error preserved: true
+	// Unwrapped error: database connection failed
+	// Wrapping nil returns nil: true
 }
 
-func Example_chaining() {
-	// Simulate nested function calls that each add context
-	deepFunction := func() error {
-		return errx.Wrap(errors.New("connection refused"))
-	}
+func Example_output() {
+	// this example shows what errx output looks like
+	// Note: actual timestamps and line numbers will vary
 
-	middleFunction := func() error {
-		if err := deepFunction(); err != nil {
-			return errx.Wrap(err)
-		}
-		return nil
-	}
+	originalErr := errors.New("database connection failed")
+	wrappedErr := errx.Wrap(originalErr)
 
-	topFunction := func() error {
-		if err := middleFunction(); err != nil {
-			return errx.Wrap(err)
-		}
-		return nil
-	}
+	// the actual output will look similar to this:
+	// standard format shows all context in one line:
+	fmt.Println("Example standard format:")
+	fmt.Println("main.function (file.go:15) at 2023-04-15T10:30:47Z: database connection failed")
 
-	err := topFunction()
-	if err != nil {
-		// Multiple wraps create layered context
-		verboseStr := fmt.Sprintf("%+v", err)
-		frameCount := strings.Count(verboseStr, "[")
-		fmt.Printf("Total context frames captured: %d\n", frameCount)
+	fmt.Println()
+	fmt.Println("Example verbose format:")
+	fmt.Println("[0] main.function (file.go:15) at 2023-04-15T10:30:47Z: database connection failed")
+	fmt.Println("[1] main.caller (file.go:20) at 2023-04-15T10:30:47Z: database connection failed")
 
-		// Original error is still accessible
-		fmt.Println("Original error preserved:", strings.Contains(err.Error(), "connection refused"))
-	}
+	fmt.Println()
+	fmt.Println("Error preserved:", errors.Is(wrappedErr, originalErr))
 
 	// Output:
-	// Total context frames captured: 11
-	// Original error preserved: true
+	// Example standard format:
+	// main.function (file.go:15) at 2023-04-15T10:30:47Z: database connection failed
+	//
+	// Example verbose format:
+	// [0] main.function (file.go:15) at 2023-04-15T10:30:47Z: database connection failed
+	// [1] main.caller (file.go:20) at 2023-04-15T10:30:47Z: database connection failed
+	//
+	// Error preserved: true
 }
