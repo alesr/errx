@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -32,7 +31,6 @@ func TestWrap(t *testing.T) {
 
 		actualErrStr := actualErr.Error()
 
-		// components are present in error string
 		testCases := []struct {
 			name     string
 			contains string
@@ -48,38 +46,6 @@ func TestWrap(t *testing.T) {
 				assert.Contains(t, actualErrStr, tc.contains)
 			})
 		}
-
-		t.Run("timestamp format", func(t *testing.T) {
-			t.Parallel()
-
-			// find "at " followed by a timestamp (starts with digit)
-			atIndex := -1
-			var pos int
-			for {
-				idx := strings.Index(actualErrStr[pos:], "at ")
-				if idx == -1 {
-					break
-				}
-				actualIdx := pos + idx
-				timestampStart := actualIdx + 3
-				if timestampStart < len(actualErrStr) && actualErrStr[timestampStart] >= '0' && actualErrStr[timestampStart] <= '9' {
-					atIndex = actualIdx
-					break
-				}
-				pos = actualIdx + 3
-			}
-
-			require.NotEqual(t, -1, atIndex)
-
-			timestampStart := atIndex + 3
-			if timestampStart+25 <= len(actualErrStr) {
-				timestampStr := actualErrStr[timestampStart : timestampStart+25]
-				_, err := time.Parse(time.RFC3339, timestampStr)
-				assert.NoError(t, err)
-			} else {
-				t.Fatalf("Error string doesn't have enough characters for timestamp: %s", actualErrStr)
-			}
-		})
 	})
 
 	t.Run("multiple context frames", func(t *testing.T) {
@@ -177,45 +143,6 @@ func TestWrap(t *testing.T) {
 		}
 	})
 
-	t.Run("timestamp recency", func(t *testing.T) {
-		t.Parallel()
-
-		before := time.Now().Add(-time.Second)
-		err := Wrap(errors.New("test"))
-		after := time.Now().Add(time.Second)
-
-		errStr := err.Error()
-
-		atIndex := -1
-		var pos int
-		for {
-			idx := strings.Index(errStr[pos:], "at ")
-			if idx == -1 {
-				break
-			}
-			actualIdx := pos + idx
-			timestampStart := actualIdx + 3
-			if timestampStart < len(errStr) && errStr[timestampStart] >= '0' && errStr[timestampStart] <= '9' {
-				atIndex = actualIdx
-				break
-			}
-			pos = actualIdx + 3
-		}
-		require.NotEqual(t, -1, atIndex)
-
-		timestampStart := atIndex + 3
-		require.LessOrEqual(t, timestampStart+25, len(errStr))
-
-		timestampStr := errStr[timestampStart : timestampStart+25]
-		timestamp, parseErr := time.Parse(time.RFC3339, timestampStr)
-		require.NoError(t, parseErr)
-
-		assert.True(t, timestamp.After(before) && timestamp.Before(after),
-			"Error timestamp %s is not within expected range (%s to %s)",
-			timestamp.Format(time.RFC3339),
-			before.Format(time.RFC3339),
-			after.Format(time.RFC3339))
-	})
 }
 
 func TestMultipleFrameCapture(t *testing.T) {
@@ -306,21 +233,20 @@ func TestExtendedErrorFormatting(t *testing.T) {
 			{
 				name: "level indicators",
 				check: func(t *testing.T, output string) {
-					assert.Contains(t, output, "[0]", "Verbose output missing level [0]: %s", output)
+					assert.Contains(t, output, "[0]")
 				},
 			},
 			{
 				name: "function names",
 				check: func(t *testing.T, output string) {
-					assert.Contains(t, output, "TestExtendedErrorFormatting", "Verbose output missing test function: %s", output)
+					assert.Contains(t, output, "TestExtendedErrorFormatting")
 				},
 			},
 			{
 				name: "line count",
 				check: func(t *testing.T, output string) {
 					lineCount := len(strings.Split(output, "\n"))
-					assert.GreaterOrEqual(t, lineCount, 2,
-						"Expected at least 2 lines in verbose output, got %d: %s", lineCount, output)
+					assert.GreaterOrEqual(t, lineCount, 2)
 				},
 			},
 		}

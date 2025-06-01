@@ -5,7 +5,6 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
-	"time"
 )
 
 const maxDepth = 10
@@ -14,7 +13,6 @@ type contextFrame struct {
 	funcName string
 	file     string
 	line     int
-	time     time.Time
 }
 
 type extendedError struct {
@@ -48,7 +46,6 @@ func Wrap(err error) error {
 		funcName: shortenFuncName(fn.Name()),
 		file:     filepath.Base(file),
 		line:     line,
-		time:     time.Now(),
 	}
 
 	// check if already wrapped
@@ -81,7 +78,6 @@ func Wrap(err error) error {
 			funcName: shortenFuncName(fn.Name()),
 			file:     filepath.Base(file),
 			line:     line,
-			time:     time.Now(),
 		})
 	}
 	return &extendedError{err: err, frames: frames}
@@ -97,11 +93,10 @@ func (e *extendedError) Error() string {
 
 	var parts []string
 	for _, frame := range e.frames {
-		part := fmt.Sprintf("%s (%s:%d) at %s",
+		part := fmt.Sprintf("%s (%s:%d)",
 			frame.funcName,
 			frame.file,
 			frame.line,
-			frame.time.Format(time.RFC3339),
 		)
 		parts = append(parts, part)
 	}
@@ -124,12 +119,11 @@ func (e *extendedError) Format(s fmt.State, verb rune) {
 		}
 
 		for i, frame := range e.frames {
-			fmt.Fprintf(s, "[%d] %s (%s:%d) at %s: %v\n",
+			fmt.Fprintf(s, "[%d] %s (%s:%d): %v\n",
 				i,
 				frame.funcName,
 				frame.file,
 				frame.line,
-				frame.time.Format(time.RFC3339),
 				e.err,
 			)
 		}

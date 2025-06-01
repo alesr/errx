@@ -35,23 +35,23 @@ func Example_output() {
 	// the actual output will look similar to this:
 	// standard format shows all context in one line:
 	fmt.Println("Example standard format:")
-	fmt.Println("main.function (file.go:15) at 2023-04-15T10:30:47Z: database connection failed")
+	fmt.Println("main.function (file.go:15): database connection failed")
 
 	fmt.Println()
 	fmt.Println("Example verbose format:")
-	fmt.Println("[0] main.function (file.go:15) at 2023-04-15T10:30:47Z: database connection failed")
-	fmt.Println("[1] main.caller (file.go:20) at 2023-04-15T10:30:47Z: database connection failed")
+	fmt.Println("[0] main.function (file.go:15): database connection failed")
+	fmt.Println("[1] main.caller (file.go:20): database connection failed")
 
 	fmt.Println()
 	fmt.Println("Error preserved:", errors.Is(wrappedErr, originalErr))
 
 	// Output:
 	// Example standard format:
-	// main.function (file.go:15) at 2023-04-15T10:30:47Z: database connection failed
+	// main.function (file.go:15): database connection failed
 	//
 	// Example verbose format:
-	// [0] main.function (file.go:15) at 2023-04-15T10:30:47Z: database connection failed
-	// [1] main.caller (file.go:20) at 2023-04-15T10:30:47Z: database connection failed
+	// [0] main.function (file.go:15): database connection failed
+	// [1] main.caller (file.go:20): database connection failed
 	//
 	// Error preserved: true
 }

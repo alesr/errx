@@ -13,19 +13,20 @@ You know the drill. Every time you handle an error, you're supposed to add conte
 func processOrder(id string) error {
     err := validateOrder(id)
     if err != nil {
-        return fmt.Errorf("validating order %s: %w", id, err)
+        return fmt.Errorf("validating order: %w", err)
     }
 
     err = saveOrder(id)
     if err != nil {
-        return fmt.Errorf("saving order %s: %w", id, err)
+        return fmt.Errorf("saving order: %w", err)
     }
 
     // ... and so on
 }
 ```
 
-It's good practice, but honestly? It gets old fast. You end up with:
+It's good practice, but:
+
 - Repetitive error wrapping everywhere
 - Inconsistent context messages
 - Missing context when you're in a hurry
@@ -48,10 +49,10 @@ func processOrder(id string) error {
 And you get this:
 
 ```
-processOrder (orders.go:15) at 2023-04-15T10:30:47Z: validateOrder (validation.go:23) at 2023-04-15T10:30:47Z: checkCustomer (customer.go:45) at 2023-04-15T10:30:47Z: order validation failed: invalid customer ID
+processOrder (orders.go:15): validateOrder (validation.go:23): checkCustomer (customer.go:45): order validation failed: invalid customer ID
 ```
 
-One `errx.Wrap()` call gives you the full call stack with timestamps. No manual context needed.
+One `errx.Wrap()` call gives you the full call stack. No manual context needed.
 
 ## Why This Matters
 
@@ -93,7 +94,7 @@ func topFunction() error {
 func main() {
     if err := topFunction(); err != nil {
         fmt.Println(err)
-        // Shows: topFunction (main.go:15) at 2023-...: middleFunction (main.go:11) at 2023-...: deepFunction (main.go:7) at 2023-...: database connection failed
+        // Shows: topFunction (main.go:15)...: middleFunction (main.go:11)...: deepFunction (main.go:7)...: database connection failed
     }
 }
 ```
@@ -108,7 +109,7 @@ go get github.com/alesr/errx
 
 **First wrap on a new error:**
 - Scans up the call stack (up to 10 levels)
-- Captures function names, files, line numbers, timestamps
+- Captures function names, files, line numbers
 - Stores it all efficiently
 
 **Subsequent wraps on already-wrapped errors:**
@@ -118,7 +119,6 @@ go get github.com/alesr/errx
 **You get:**
 - Function names (cleaned up, no ugly package paths)
 - File names and line numbers
-- RFC3339 timestamps
 - Full compatibility with `errors.Is`, `errors.As`, `errors.Unwrap`
 
 ## Examples
@@ -156,9 +156,9 @@ Use `%+v` to see each frame on its own line:
 ```go
 fmt.Printf("%+v\n", err)
 // Output:
-// [0] handleRequest (handler.go:20) at 2023-04-15T10:30:47Z: API timeout
-// [1] processRequest (logic.go:15) at 2023-04-15T10:30:47Z: API timeout
-// [2] callAPI (client.go:10) at 2023-04-15T10:30:47Z: API timeout
+// [0] handleRequest (handler.go:20): API timeout
+// [1] processRequest (logic.go:15): API timeout
+// [2] callAPI (client.go:10): API timeout
 ```
 
 ### Mix with Manual Context
