@@ -51,8 +51,25 @@ func TestWrap(t *testing.T) {
 
 		t.Run("timestamp format", func(t *testing.T) {
 			t.Parallel()
-			atIndex := strings.Index(actualErrStr, "at ")
-			require.NotEqual(t, -1, atIndex, "Error string should contain 'at ': %s", actualErrStr)
+
+			// find "at " followed by a timestamp (starts with digit)
+			atIndex := -1
+			var pos int
+			for {
+				idx := strings.Index(actualErrStr[pos:], "at ")
+				if idx == -1 {
+					break
+				}
+				actualIdx := pos + idx
+				timestampStart := actualIdx + 3
+				if timestampStart < len(actualErrStr) && actualErrStr[timestampStart] >= '0' && actualErrStr[timestampStart] <= '9' {
+					atIndex = actualIdx
+					break
+				}
+				pos = actualIdx + 3
+			}
+
+			require.NotEqual(t, -1, atIndex)
 
 			timestampStart := atIndex + 3
 			if timestampStart+25 <= len(actualErrStr) {
@@ -169,8 +186,21 @@ func TestWrap(t *testing.T) {
 
 		errStr := err.Error()
 
-		// Find "at " and extract the timestamp
-		atIndex := strings.Index(errStr, "at ")
+		atIndex := -1
+		var pos int
+		for {
+			idx := strings.Index(errStr[pos:], "at ")
+			if idx == -1 {
+				break
+			}
+			actualIdx := pos + idx
+			timestampStart := actualIdx + 3
+			if timestampStart < len(errStr) && errStr[timestampStart] >= '0' && errStr[timestampStart] <= '9' {
+				atIndex = actualIdx
+				break
+			}
+			pos = actualIdx + 3
+		}
 		require.NotEqual(t, -1, atIndex)
 
 		timestampStart := atIndex + 3
